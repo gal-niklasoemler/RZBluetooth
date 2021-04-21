@@ -129,11 +129,15 @@
     NSError *error = [NSError errorWithDomain:RZBluetoothErrorDomain
                                          code:RZBluetoothConnectionCancelled
                                      userInfo:@{}];
-
+    
     RZBUUIDPath *path = RZBUUIDP(self.identifier);
     NSArray *commands = [self.dispatch commandsOfClass:nil matchingUUIDPath:path];
-
+    
     for (RZBCommand *command in commands) {
+        if (command.isExecuted == YES && command.isCompleted == NO) {
+            // We are in the completion handler of this command. Do not complete it or we will loop infinitely.
+            continue;
+        }
         [self.dispatch completeCommand:command
                             withObject:nil error:error];
     }
@@ -195,11 +199,11 @@
 {
     RZB_DEFAULT_BLOCK(completion);
     RZBUUIDPath *path = RZBUUIDP(self.identifier, serviceUUID, characteristicUUID);
-
+    
     // Remove the completion block immediately to behave consistently.
     // If anything here is nil, there is no completion block, which is fine.
     [self setNotifyBlock:nil forCharacteristicUUID:characteristicUUID serviceUUID:serviceUUID];
-
+    
     // Disable the notify characteristic on the peripheral if the peripheral is
     // connected. If not connected, trigger completion.
     if (self.corePeripheral.state == CBPeripheralStateConnected) {
@@ -276,7 +280,7 @@ characteristicUUID:(CBUUID *)characteristicUUID
 - (void)connectionEvent:(RZBPeripheralStateEvent)event error:(NSError * __nullable)error;
 {
     [self.connectionDelegate peripheral:self connectionEvent:event error:error];
-
+    
     if (event != RZBPeripheralStateEventConnectSuccess && self.maintainConnection) {
         [self connectWithCompletion:nil];
     }
